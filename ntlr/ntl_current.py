@@ -12,11 +12,11 @@ def initialize_gee(project_id):
     """Authenticate and initialize GEE"""
     try:
         ee.Initialize(project=project_id)
-        print(f"✅ GEE initialized for project {project_id}")
+        print(f" GEE initialized for project {project_id}")
     except Exception:
         ee.Authenticate()
         ee.Initialize(project=project_id)
-        print(f"✅ GEE authenticated and initialized for project {project_id}")
+        print(f" GEE authenticated and initialized for project {project_id}")
 
 def get_reducer():
     """Define multi-stat reducer after GEE is initialized"""
@@ -88,7 +88,7 @@ def submit_export_to_gcs(fc, start_idx, end_idx):
         fileFormat='CSV'
     )
     task.start()
-    print(f"✅ Submitted GEE export to GCS: gs://{Config.GCS_BUCKET}/current/{file_prefix}.csv")
+    print(f" Submitted GEE export to GCS: gs://{Config.GCS_BUCKET}/current/{file_prefix}.csv")
     return task
 
 def monitor_task(task, sleep_sec=30):
@@ -99,5 +99,5 @@ def monitor_task(task, sleep_sec=30):
             break
         print(f"⏳ Task {task.status()['description']} status: {status} (waiting {sleep_sec}s)")
         time.sleep(sleep_sec)
-    print(f"✅ Task finished with status: {status}")
+    print(f" Task finished with status: {status}")
     return status

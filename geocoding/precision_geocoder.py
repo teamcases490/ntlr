@@ -113,14 +113,14 @@ class PrecisionGeocoder:
                         required_precision
                     ):
                         logger.info(
-                            f"✅ Success with {strategy_name} - "
+                            f" Success with {strategy_name} - "
                             f"Type: {result.location.location_type.value}, "
                             f"Quality: {result.location.quality_score:.2f}"
                         )
                         return result
                     else:
                         logger.info(
-                            f"⚠️ {strategy_name} succeeded but precision insufficient - "
+                            f"️ {strategy_name} succeeded but precision insufficient - "
                             f"Got: {result.location.location_type.value}, "
                             f"Need: {required_precision.value}"
                         )
@@ -211,7 +211,7 @@ class PrecisionGeocoder:
                 
                 if location and location.is_high_precision():
                     logger.info(
-                        f"✅ Autocomplete enhanced precision to "
+                        f" Autocomplete enhanced precision to "
                         f"{location.location_type.value}"
                     )
                     return PipelineResult(
@@ -309,7 +309,7 @@ class PrecisionGeocoder:
                 location = self.geocoder.geocode_by_components(components)
                 
                 if location and location.location_type == LocationType.RANGE_INTERPOLATED:
-                    logger.info("✅ Component-based geocoding achieved RANGE_INTERPOLATED")
+                    logger.info(" Component-based geocoding achieved RANGE_INTERPOLATED")
                     return PipelineResult(
                         success=True,
                         location=location,
@@ -502,11 +502,11 @@ class PrecisionGeocoder:
             
             if result.success:
                 logger.info(
-                    f"  ✅ Success - {result.location.location_type.value} "
+                    f"   Success - {result.location.location_type.value} "
                     f"(±{result.location.get_uncertainty_radius()}m)"
                 )
             else:
-                logger.warning(f"  ❌ Failed - {result.error_message}")
+                logger.warning(f"   Failed - {result.error_message}")
         
         # Summary
         successful = sum(1 for r in results if r.success)
@@ -586,7 +586,7 @@ if __name__ == "__main__":
         
         if result.success:
             loc = result.location
-            print(f"✅ SUCCESS")
+            print(f" SUCCESS")
             print(f"   Strategy: {result.metadata.get('strategy', 'unknown')}")
             print(f"   Lat/Lng: {loc.latitude:.6f}, {loc.longitude:.6f}")
             print(f"   Type: {loc.location_type.value}")
@@ -598,5 +598,5 @@ if __name__ == "__main__":
             if loc.warnings:
                 print(f"   Warnings: {', '.join(loc.warnings)}")
         else:
-            print(f"❌ FAILED")
+            print(f" FAILED")
             print(f"   Error: {result.error_message}")

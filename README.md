@@ -8,20 +8,20 @@ Complete end-to-end pipeline for address geocoding and Metro/Urban/Rural classif
 
 ## Features
 
-✅ **Advanced Geocoding**
+ **Advanced Geocoding**
 - Autocomplete for address enhancement
 - Address validation and standardization  
 - 3 fallback strategies for maximum success rate
 - Multi-level caching (70-80% cost reduction)
 - India-specific optimizations
 
-✅ **NTLR Scoring**
+ **NTLR Scoring**
 - Google Earth Engine integration
 - Current (2025) + Historical (2020-2025) NTL data
 - Spatial, temporal, and current score components
 - Automated Metro/Urban/Rural classification
 
-✅ **Production Ready**
+ **Production Ready**
 - Comprehensive error handling
 - Batch processing support
 - Detailed logging

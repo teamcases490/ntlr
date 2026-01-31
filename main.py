@@ -35,7 +35,7 @@ def batch_iterator(df, batch_size):
 def init_gcs_client():
     """Initialize Google Cloud Storage client"""
     if not os.path.exists(Config.SERVICE_ACCOUNT_FILE):
-        print(f"\n❌ Error: Google Service Account file '{Config.SERVICE_ACCOUNT_FILE}' not found.")
+        print(f"\n Error: Google Service Account file '{Config.SERVICE_ACCOUNT_FILE}' not found.")
         print("   Please place your 'credentials.json' file in this directory.")
         sys.exit(1)
         
@@ -52,7 +52,7 @@ def download_from_gcs(client, prefix, local_folder):
     blobs = list(bucket.list_blobs(prefix=prefix))
     
     if not blobs:
-        print(f"⚠️ No files found in gs://{Config.GCS_BUCKET}/{prefix}")
+        print(f"️ No files found in gs://{Config.GCS_BUCKET}/{prefix}")
         return []
     
     downloaded_files = []
@@ -66,7 +66,7 @@ def download_from_gcs(client, prefix, local_folder):
         
         blob.download_to_filename(local_path)
         downloaded_files.append(local_path)
-        print(f"✅ Downloaded {filename} from GCS")
+        print(f" Downloaded {filename} from GCS")
     
     return downloaded_files
 
@@ -89,14 +89,14 @@ def main():
     address_col = input("Enter column name containing addresses: ").strip()
     
     if not os.path.exists(input_csv):
-        print(f"❌ Error: File '{input_csv}' not found")
+        print(f" Error: File '{input_csv}' not found")
         return
     
     df = pd.read_csv(input_csv)
-    print(f"📄 Loaded {len(df)} rows from {input_csv}")
+    print(f" Loaded {len(df)} rows from {input_csv}")
     
     if address_col not in df.columns:
-        print(f"❌ Error: Column '{address_col}' not found in CSV")
+        print(f" Error: Column '{address_col}' not found in CSV")
         print(f"Available columns: {', '.join(df.columns)}")
         return
     
@@ -139,16 +139,16 @@ def main():
         batch_geocoded = pd.DataFrame(batch_results)
         batch_geocoded.to_csv(f"geocoded_{start+1}_{end}.csv", index=False)
         geocoded_batches.append(batch_geocoded)
-        print(f"✅ Batch {start+1}-{end} geocoded and saved")
+        print(f" Batch {start+1}-{end} geocoded and saved")
     
     df_geocoded = pd.concat(geocoded_batches, ignore_index=True)
     df_geocoded = df_geocoded.dropna(subset=['Latitude', 'Longitude'])
     
     success_rate = len(df_geocoded) / len(df) * 100
-    print(f"\n✅ Geocoding complete: {len(df_geocoded)}/{len(df)} successful ({success_rate:.1f}%)")
+    print(f"\n Geocoding complete: {len(df_geocoded)}/{len(df)} successful ({success_rate:.1f}%)")
     
     if len(df_geocoded) == 0:
-        print("❌ No valid coordinates found. Exiting.")
+        print(" No valid coordinates found. Exiting.")
         return
     
     print("\n" + "="*70)
@@ -175,7 +175,7 @@ def main():
         task = submit_hist_gcs(fc_hist_collection, start+1, end)
         monitor_hist(task)
     
-    print("\n✅ All GEE batches submitted. Waiting for GCS exports...")
+    print("\n All GEE batches submitted. Waiting for GCS exports...")
     
     print("\n" + "="*70)
     print("STEP 4: DOWNLOAD FROM GOOGLE CLOUD STORAGE")
@@ -227,11 +227,11 @@ def main():
     print("\n" + "="*70)
     print("PIPELINE COMPLETE!")
     print("="*70)
-    print(f"📊 Total addresses processed: {len(final_df)}")
-    print(f"📊 Rural: {len(final_df[final_df['ntlr_region']=='Rural'])}")
-    print(f"📊 Urban: {len(final_df[final_df['ntlr_region']=='Urban'])}")
-    print(f"📊 Metro: {len(final_df[final_df['ntlr_region']=='Metro'])}")
-    print(f"\n🎉 Final CSV saved as: {output_csv}")
+    print(f" Total addresses processed: {len(final_df)}")
+    print(f" Rural: {len(final_df[final_df['ntlr_region']=='Rural'])}")
+    print(f" Urban: {len(final_df[final_df['ntlr_region']=='Urban'])}")
+    print(f" Metro: {len(final_df[final_df['ntlr_region']=='Metro'])}")
+    print(f"\n Final CSV saved as: {output_csv}")
 
 if __name__ == "__main__":
     main()

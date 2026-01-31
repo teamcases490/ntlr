@@ -15,7 +15,7 @@ def load_csv_batches(folder, pattern):
     if not files:
         raise FileNotFoundError(f"No files matching '{pattern}' in folder '{folder}'")
     df = pd.concat([pd.read_csv(os.path.join(folder, f)) for f in files], ignore_index=True)
-    print(f"✅ Loaded {len(df)} rows from {len(files)} file(s)")
+    print(f" Loaded {len(df)} rows from {len(files)} file(s)")
     return df
 
 def weighted_avg(group, col):

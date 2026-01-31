@@ -74,21 +74,21 @@ def create_2025_ntl_collection(fc):
 
     return fc.map(calc_point_stats).flatten()
 
-def submit_export_to_drive(fc, start_idx, end_idx, drive_folder):
-    """Export FeatureCollection to Google Drive"""
+def submit_export_to_gcs(fc, start_idx, end_idx):
+    """Export FeatureCollection to Google Cloud Storage"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_prefix = f"ntl_raw_2025_{start_idx}_{end_idx}"
     description = f"{file_prefix}_{timestamp}"
 
-    task = ee.batch.Export.table.toDrive(
+    task = ee.batch.Export.table.toCloudStorage(
         collection=fc,
         description=description,
-        folder=drive_folder,
-        fileNamePrefix=file_prefix,
+        bucket=Config.GCS_BUCKET,
+        fileNamePrefix=f"current/{file_prefix}",
         fileFormat='CSV'
     )
     task.start()
-    print(f"✅ Submitted GEE export to Drive: {file_prefix}")
+    print(f"✅ Submitted GEE export to GCS: gs://{Config.GCS_BUCKET}/current/{file_prefix}.csv")
     return task
 
 def monitor_task(task, sleep_sec=30):

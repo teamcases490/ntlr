@@ -40,6 +40,11 @@ class Config:
     
     BATCH_SIZE = 1000
     SLEEP_SEC = 0.05
+    
+    # Google Cloud Storage (replaces Drive)
+    GCS_BUCKET = os.getenv('GCS_BUCKET', 'ntlr')
+    
+    # Legacy Drive config (kept for backward compatibility)
     DRIVE_FOLDER_CURRENT = 'NTLR_2025_Raw_Data'
     DRIVE_FOLDER_HISTORICAL = 'NTLR_Historical_Data'
     DOWNLOAD_FOLDER = 'downloads'

@@ -104,7 +104,9 @@ Input CSV
     ↓
 Advanced Geocoding (with caching)
     ↓
-Google Earth Engine (Current + Historical NTL)
+Google Earth Engine → Google Cloud Storage
+    ↓
+Download from GCS
     ↓
 NTLR Scoring
     ↓
@@ -173,10 +175,12 @@ Edit `config.py` or set environment variables:
 
 ### Google Earth Engine
 - Enabled project
-- Service account with Drive access
-- Google Drive folders:
-  - `NTLR_2025_Raw_Data`
-  - `NTLR_Historical_Data`
+- Authenticated with your Google account
+
+### Google Cloud Storage
+- GCS bucket created (e.g., `ntlr`)
+- Service account with Storage Object Admin role
+- Your GEE account with Storage Object Admin role
 
 ---
 
@@ -296,8 +300,11 @@ For issues or questions:
 
 ## Version
 
-**v1.0.0** - Production Ready Integration
+**v2.0.0** - Google Cloud Storage Migration
 
+- **NEW**: Google Cloud Storage integration (replaces Drive)
+- Faster and more reliable data exports
+- Scalable for large datasets
 - Advanced geocoding with caching
 - Complete NTLR pipeline
 - Production-ready error handling

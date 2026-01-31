@@ -36,6 +36,11 @@ def calculate_ntlr(raw_df, hist_df):
         'avg_rad_p75': 'p75'
     })
     raw_df['buffer_m'] = raw_df['buffer_m'].astype(int)
+    
+    # CRITICAL: Deduplicate to prevent double-counting if ID appears multiple times
+    raw_df = raw_df.drop_duplicates(subset=['id', 'buffer_m'])
+    hist_df = hist_df.drop_duplicates(subset=['id', 'year'])
+    
     g = raw_df.groupby('id', sort=False)
 
     # ---------------- Current weighted metrics ----------------

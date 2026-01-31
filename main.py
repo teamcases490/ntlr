@@ -11,21 +11,19 @@ from ntlr.ntl_current import (
     initialize_gee as init_gee_current,
     create_feature_collection as fc_current,
     create_2025_ntl_collection,
-    submit_export_to_drive,
+    submit_export_to_gcs,
     monitor_task
 )
 from ntlr.ntl_historical import (
     initialize_gee as init_gee_hist,
     create_feature_collection as fc_hist,
     create_historical_ntl_collection,
-    submit_export_to_drive as submit_hist,
+    submit_export_to_gcs as submit_hist_gcs,
     monitor_task as monitor_hist
 )
 from ntlr.ntlr_scoring import load_csv_batches, calculate_ntlr
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from google.cloud import storage
 from google.oauth2 import service_account
-import io
 import time
 
 def batch_iterator(df, batch_size):
@@ -34,47 +32,41 @@ def batch_iterator(df, batch_size):
         end = min(start + batch_size, total)
         yield start, end
 
-def init_drive_service():
+def init_gcs_client():
+    """Initialize Google Cloud Storage client"""
     if not os.path.exists(Config.SERVICE_ACCOUNT_FILE):
         print(f"\n❌ Error: Google Service Account file '{Config.SERVICE_ACCOUNT_FILE}' not found.")
         print("   Please place your 'credentials.json' file in this directory.")
-        print("   This is required for accessing Google Drive to download NTLR data.")
         sys.exit(1)
         
     creds = service_account.Credentials.from_service_account_file(
-        Config.SERVICE_ACCOUNT_FILE,
-        scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        Config.SERVICE_ACCOUNT_FILE
     )
-    return build("drive", "v3", credentials=creds)
+    return storage.Client(credentials=creds, project=creds.project_id)
 
-def download_drive_folder(service, folder_name, local_folder):
+def download_from_gcs(client, prefix, local_folder):
+    """Download all files from GCS bucket with given prefix"""
     os.makedirs(local_folder, exist_ok=True)
     
-    query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder'"
-    results = service.files().list(q=query, fields="files(id, name)").execute()
-    items = results.get('files', [])
-    if not items:
-        raise FileNotFoundError(f"Folder '{folder_name}' not found in Drive")
-    folder_id = items[0]['id']
+    bucket = client.bucket(Config.GCS_BUCKET)
+    blobs = list(bucket.list_blobs(prefix=prefix))
     
-    query = f"'{folder_id}' in parents and mimeType!='application/vnd.google-apps.folder'"
-    results = service.files().list(q=query, pageSize=1000, fields="files(id, name)").execute()
-    files = results.get('files', [])
-    
-    if not files:
-        print(f"⚠️ No files found in Drive folder {folder_name}")
+    if not blobs:
+        print(f"⚠️ No files found in gs://{Config.GCS_BUCKET}/{prefix}")
         return []
     
     downloaded_files = []
-    for f in files:
-        request = service.files().get_media(fileId=f['id'])
-        fh = io.FileIO(os.path.join(local_folder, f['name']), 'wb')
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-        downloaded_files.append(os.path.join(local_folder, f['name']))
-        print(f"✅ Downloaded {f['name']}")
+    for blob in blobs:
+        # Skip folder markers
+        if blob.name.endswith('/'):
+            continue
+            
+        filename = os.path.basename(blob.name)
+        local_path = os.path.join(local_folder, filename)
+        
+        blob.download_to_filename(local_path)
+        downloaded_files.append(local_path)
+        print(f"✅ Downloaded {filename} from GCS")
     
     return downloaded_files
 
@@ -168,7 +160,7 @@ def main():
         batch_df = df_geocoded.iloc[start:end]
         fc = fc_current(batch_df)
         fc_2025 = create_2025_ntl_collection(fc)
-        task = submit_export_to_drive(fc_2025, start+1, end, Config.DRIVE_FOLDER_CURRENT)
+        task = submit_export_to_gcs(fc_2025, start+1, end)
         monitor_task(task)
     
     print("\n" + "="*70)
@@ -180,24 +172,24 @@ def main():
         batch_df = df_geocoded.iloc[start:end]
         fc = fc_hist(batch_df)
         fc_hist_collection = create_historical_ntl_collection(fc)
-        task = submit_hist(fc_hist_collection, start+1, end, Config.DRIVE_FOLDER_HISTORICAL)
+        task = submit_hist_gcs(fc_hist_collection, start+1, end)
         monitor_hist(task)
     
-    print("\n✅ All GEE batches submitted. Waiting for Drive exports...")
+    print("\n✅ All GEE batches submitted. Waiting for GCS exports...")
     
     print("\n" + "="*70)
-    print("STEP 4: DOWNLOAD FROM GOOGLE DRIVE")
+    print("STEP 4: DOWNLOAD FROM GOOGLE CLOUD STORAGE")
     print("="*70)
     
-    service = init_drive_service()
-    raw_csvs = download_drive_folder(
-        service, 
-        Config.DRIVE_FOLDER_CURRENT, 
+    client = init_gcs_client()
+    raw_csvs = download_from_gcs(
+        client,
+        "current/",
         os.path.join(Config.DOWNLOAD_FOLDER, "current")
     )
-    hist_csvs = download_drive_folder(
-        service, 
-        Config.DRIVE_FOLDER_HISTORICAL, 
+    hist_csvs = download_from_gcs(
+        client,
+        "historical/",
         os.path.join(Config.DOWNLOAD_FOLDER, "historical")
     )
     

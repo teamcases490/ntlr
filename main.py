@@ -82,7 +82,7 @@ def classify_ntlr(score):
 
 def main():
     print("="*70)
-    print("INTEGRATED NTLR PIPELINE - Production Ready")
+    print(" Integrated NTLR PIPELINE with Geocoding ")
     print("="*70)
     
     input_csv = input("Enter input CSV filename: ").strip()
@@ -101,7 +101,7 @@ def main():
         return
     
     print("\n" + "="*70)
-    print("STEP 1: ADVANCED GEOCODING")
+    print("STEP 1: GEOCODING")
     print("="*70)
     
     pipeline = GeocodingPipeline(use_cache=True)

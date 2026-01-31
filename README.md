@@ -299,8 +299,6 @@ For issues or questions:
 
 ## Version
 
-**v2.0.0** - Google Cloud Storage Migration
-
 - Google Cloud Storage integration 
 - Faster and more reliable data exports
 - Scalable for large datasets

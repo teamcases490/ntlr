@@ -1,6 +1,5 @@
-# Integrated NTLR Pipeline - Production Ready
+# Integrated NTLR Pipeline 
 
-**Geocoding + Night-Time Light Rating System**
 
 Complete end-to-end pipeline for address geocoding and Metro/Urban/Rural classification using satellite night-time light data.
 

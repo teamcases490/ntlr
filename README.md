@@ -301,7 +301,7 @@ For issues or questions:
 
 **v2.0.0** - Google Cloud Storage Migration
 
-- **NEW**: Google Cloud Storage integration (replaces Drive)
+- Google Cloud Storage integration 
 - Faster and more reliable data exports
 - Scalable for large datasets
 - Advanced geocoding with caching

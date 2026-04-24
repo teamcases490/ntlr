@@ -1,0 +1,69 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Virtual Environment
+# =========================
+venv/
+.venv/
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+*.env
+
+# =========================
+# Earth Engine Auth (IMPORTANT)
+# =========================
+.credentials/
+earthengine/
+
+# =========================
+# Data files (BIG / GENERATED)
+# =========================
+*.csv
+*.xlsx
+*.parquet
+
+# BUT keep sample or schema if needed
+!sample.csv
+
+# =========================
+# Outputs (generated results)
+# =========================
+results/
+outputs/
+ntlr_output*.csv
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# OS junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Cache / temp
+# =========================
+.cache/

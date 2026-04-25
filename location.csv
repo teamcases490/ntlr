@@ -1,0 +1,15 @@
+address,Latitude,Longitude,used_address,geocode_strategy,geocode_confidence
+"41, 7th Cross Rd, Seethappa Layout, Chamundi Nagar, Hebbal, Bengaluru, Karnataka 560032",13.033571,77.6024252,"41, 7th Cross Rd, Seethappa Layout, Chamundi Nagar, Hebbal, Bengaluru, Karnataka 560032, India",address_validation+place_id,0.8
+"Beerappagadda,
+Uppal,
+Secunderabad, Hyderabad, Telangana 500039",17.4058261,78.5646261,"Beerappagadda, Uppal, Secunderabad, Hyderabad, Telangana 500039, India",address_validation+place_id,0.6
+"Robinson Church Compound, 13 Sankli Street, Byculla, Mumbai 400008",18.9717894,72.8309143,"44-B, Shaikh Hafizuddin Marg, Ashadham Colony, Madanpura, Mumbai, Maharashtra 400008, India",address_validation+place_id,0.8
+"Ranade Rd, near AXIS BANK, Dadar West, Dadar, Mumbai, Maharashtra 400028",19.0216398,72.8394347,"Ranade Rd, Dadar West, Dadar, Mumbai, Maharashtra 400028, India",address_validation+place_id,0.8
+"Kamthana, Odisha 766002",19.9537514,83.1273705,"Kamthana, Odisha 766002, India",sanitized+place_id,0.6
+"Nagarbastikeri, Karnataka 581384",14.2327113,74.68102739999999,"Nagarbastikeri, Karnataka 581384, India",sanitized+place_id,0.6
+"62/1, Society, Kishan Nagar, Sector 26, Gandhinagar, Gujarat 382028",23.251211,72.6432789,"1 Society, Kishan Nagar, Sector 26, Gandhinagar, Gujarat 382028, India",address_validation+place_id,0.8
+"52, Rajendra Gunj, Raichur, Karnataka 584102",16.2338235,77.355006,"52, Rajendra Gunj, Raichur, Karnataka 584102, India",address_validation+place_id,0.6
+"7, Greater Kailash-1, M Block, part 2, Greater Kailash, New Delhi, Delhi 110048",28.533806,77.2465778,"part 2, Block S, Greater Kailash II, Greater Kailash, New Delhi, Delhi 110019, India",address_validation+place_id,0.8
+"Tikamgarh,Madhya Pradesh 472001",24.745762,78.8314771,"Tikamgarh, Madhya Pradesh 472001, India",sanitized+place_id,0.6
+"Ananda Theertha Agraharam
+Guntur, Andhra Pradesh 522004",16.2994954,80.4198802,"Ananda Theertha Agraharam, Guntur, Andhra Pradesh 522004, India",address_validation+place_id,0.6

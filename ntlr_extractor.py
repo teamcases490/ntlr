@@ -91,18 +91,23 @@ def compute_features(feature):
     return ee.Feature(geom, props)
 
 
-# ================= APPLY =================
-result = points.map(compute_features)
+def run_extraction():
 
-# ================= EXPORT =================
-task = ee.batch.Export.table.toDrive(
-    collection=result,
-    description="NTLR_BUFFER_FEATURES",
-    folder="EarthEngine",
-    fileNamePrefix="ntlr_features",
-    fileFormat="CSV"
-)
+    result = points.map(compute_features)
 
-task.start()
+    task = ee.batch.Export.table.toDrive(
+        collection=result,
+        description="NTLR_BUFFER_FEATURES",
+        folder="EarthEngine",
+        fileNamePrefix="ntlr_features",
+        fileFormat="CSV"
+    )
 
-print("🚀 Export started. Check Google Drive.")
+    task.start()
+
+    print("🚀 Export started")
+    return task
+
+
+if __name__ == "__main__":
+    run_extraction()

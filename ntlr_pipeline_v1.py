@@ -45,7 +45,42 @@ def get_reducer():
 
 
 # ================= CURRENT =================
-def get_current_ntl(lat, lon):
+# def get_current_ntl(lat, lon): # this contains only limited raw data (mean, median, mode, stddev, p25, p75, min, max)
+#     viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select('avg_rad')
+#     image = viirs.filterDate('2025-03-01', '2025-04-01').first()
+
+#     point = ee.Geometry.Point([lon, lat])
+#     reducer = get_reducer()
+
+#     results = []
+
+#     for dist in BUFFER_DISTANCES:
+#         stats = image.reduceRegion(
+#             reducer=reducer,
+#             geometry=point.buffer(dist),
+#             scale=500,
+#             bestEffort=True
+#         ).getInfo()
+
+#         stats['buffer_m'] = dist
+#         results.append(stats)
+
+#     df = pd.DataFrame(results)
+
+#     df = df.rename(columns={
+#         'avg_rad_mean': 'mean',
+#         'avg_rad_median': 'median',
+#         'avg_rad_mode': 'mode',
+#         'avg_rad_stdDev': 'stdDev',
+#         'avg_rad_p25': 'p25',
+#         'avg_rad_p75': 'p75',
+#         'avg_rad_min': 'min',
+#         'avg_rad_max': 'max'
+#     })
+
+#     return df
+
+def get_current_ntl(lat, lon): # this contains extended raw data (mean, median, mode, stddev, p25, p75, min, max + variance, cv, range, iqr, p10, p90)
     viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select('avg_rad')
     image = viirs.filterDate('2025-03-01', '2025-04-01').first()
 
@@ -67,6 +102,7 @@ def get_current_ntl(lat, lon):
 
     df = pd.DataFrame(results)
 
+    # ---------------- existing rename ----------------
     df = df.rename(columns={
         'avg_rad_mean': 'mean',
         'avg_rad_median': 'median',
@@ -77,6 +113,18 @@ def get_current_ntl(lat, lon):
         'avg_rad_min': 'min',
         'avg_rad_max': 'max'
     })
+
+    # ================= EXTRA RAW FEATURES =================
+    df["variance"] = df["stdDev"] ** 2
+    df["cv"] = df["stdDev"] / (df["mean"] + 1e-6)
+
+    df["range"] = df["max"] - df["min"]
+
+    # approx distribution spread metrics
+    df["iqr"] = df["p75"] - df["p25"]
+
+    df["p10"] = df["min"] + 0.1 * (df["max"] - df["min"])
+    df["p90"] = df["min"] + 0.9 * (df["max"] - df["min"])
 
     return df
 
@@ -112,7 +160,13 @@ def flatten_current_features(current_df):
     for _, row in current_df.iterrows():
         b = int(row["buffer_m"])
 
-        for col in ["mean", "median", "mode", "stdDev", "p25", "p75", "min", "max"]:
+        for col in [
+            "mean", "median", "mode",
+            "stdDev", "variance", "cv",
+            "p25", "p75", "p10", "p90",
+            "min", "max",
+            "range", "iqr"
+        ]:
             if col in row:
                 out[f"{col}_{b}"] = row[col]
 

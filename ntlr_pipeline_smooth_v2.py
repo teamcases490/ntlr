@@ -5,10 +5,10 @@ from scipy.stats import linregress
 import time
 from tqdm import tqdm
 import os
+import json
 
 # ================= CONFIG =================
 PROJECT_ID = "incomeestimationcase-468413"
-OUTPUT_FILE = "ntlr_output_smooth_v2_full.csv"
 
 BUFFER_DISTANCES = [500, 1000, 1500, 2000]
 YEARS = list(range(2020, 2026))
@@ -20,6 +20,10 @@ BUFFER_WEIGHTS = {
     2000: 0.06
 }
 
+OUTPUT_FILE = "ntlr_output_final.csv"
+CHECKPOINT_FILE = "ntlr_checkpoint.txt"
+PROCESSED_FILE = "ntlr_processed.json"
+
 EPS = 1e-6
 # ==========================================
 
@@ -28,26 +32,71 @@ EPS = 1e-6
 def initialize_gee():
     try:
         ee.Initialize(project=PROJECT_ID)
-    except:
+    except Exception:
         ee.Authenticate()
         ee.Initialize(project=PROJECT_ID)
     print("✅ GEE Initialized")
 
 
+# ================= CHECKPOINT =================
+def load_checkpoint():
+    if os.path.exists(CHECKPOINT_FILE):
+        with open(CHECKPOINT_FILE, "r") as f:
+            return int(f.read().strip())
+    return 0
+
+
+def save_checkpoint(idx):
+    tmp = CHECKPOINT_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(str(idx))
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, CHECKPOINT_FILE)
+
+
+def load_processed():
+    if os.path.exists(PROCESSED_FILE):
+        with open(PROCESSED_FILE, "r") as f:
+            return set(tuple(x) for x in json.load(f))
+    return set()
+
+
+def save_processed(processed):
+    tmp = PROCESSED_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(list(processed), f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, PROCESSED_FILE)
+
+
 # ================= REDUCER =================
 def get_reducer():
-    return ee.Reducer.mean() \
-        .combine(ee.Reducer.median(), None, True) \
-        .combine(ee.Reducer.mode(), None, True) \
-        .combine(ee.Reducer.minMax(), None, True) \
-        .combine(ee.Reducer.stdDev(), None, True) \
+    return (
+        ee.Reducer.mean()
+        .combine(ee.Reducer.median(), None, True)
+        .combine(ee.Reducer.stdDev(), None, True)
+        .combine(ee.Reducer.minMax(), None, True)
         .combine(ee.Reducer.percentile([25, 75]), None, True)
+    )
+
+
+# ================= SAFE GEE FETCH =================
+def safe_get(d):
+    try:
+        return d.getInfo()
+    except:
+        return None
 
 
 # ================= CURRENT =================
 def get_current_ntl(lat, lon):
-    viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select('avg_rad')
-    image = viirs.filterDate('2025-03-01', '2025-04-01').first()
+    viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select("avg_rad")
+
+    image = viirs.filterDate("2025-03-01", "2025-04-01").first()
+    if image is None:
+        return pd.DataFrame()
 
     point = ee.Geometry.Point([lon, lat])
     reducer = get_reducer()
@@ -55,46 +104,55 @@ def get_current_ntl(lat, lon):
     results = []
 
     for dist in BUFFER_DISTANCES:
-        stats = image.reduceRegion(
-            reducer=reducer,
-            geometry=point.buffer(dist),
-            scale=500,
-            bestEffort=True
-        ).getInfo()
+        stats = safe_get(
+            image.reduceRegion(
+                reducer=reducer,
+                geometry=point.buffer(dist),
+                scale=500,
+                bestEffort=True
+            )
+        )
 
-        stats['buffer_m'] = dist
+        if stats is None:
+            continue
+
+        stats["buffer_m"] = dist
         results.append(stats)
 
     df = pd.DataFrame(results)
 
-    # rename base stats
+    if df.empty:
+        return df
+
     df = df.rename(columns={
-        'avg_rad_mean': 'mean',
-        'avg_rad_median': 'median',
-        'avg_rad_mode': 'mode',
-        'avg_rad_stdDev': 'stdDev',
-        'avg_rad_p25': 'p25',
-        'avg_rad_p75': 'p75',
-        'avg_rad_min': 'min',
-        'avg_rad_max': 'max'
+        "avg_rad_mean": "mean",
+        "avg_rad_median": "median",
+        "avg_rad_stdDev": "stdDev",
+        "avg_rad_min": "min",
+        "avg_rad_max": "max",
+        "avg_rad_p25": "p25",
+        "avg_rad_p75": "p75"
     })
 
-    # ================= EXTENDED FEATURES =================
+    # safe numeric fill
+    for c in ["mean", "median", "stdDev", "min", "max", "p25", "p75"]:
+        if c in df:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
     df["variance"] = df["stdDev"] ** 2
     df["cv"] = df["stdDev"] / (df["mean"] + EPS)
-
     df["range"] = df["max"] - df["min"]
     df["iqr"] = df["p75"] - df["p25"]
-
-    df["p10"] = df["min"] + 0.1 * (df["max"] - df["min"])
-    df["p90"] = df["min"] + 0.9 * (df["max"] - df["min"])
+    df["p10"] = df["min"] + 0.1 * df["range"]
+    df["p90"] = df["min"] + 0.9 * df["range"]
 
     return df
 
 
 # ================= HISTORICAL =================
 def get_historical_ntl(lat, lon):
-    viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select('avg_rad')
+    viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select("avg_rad")
+
     point = ee.Geometry.Point([lon, lat])
 
     data = []
@@ -102,98 +160,78 @@ def get_historical_ntl(lat, lon):
     for year in YEARS:
         img = viirs.filterDate(f"{year}-03-01", f"{year}-04-01").first()
 
-        val = img.reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=point.buffer(500),
-            scale=500,
-            bestEffort=True
-        ).get('avg_rad')
+        if img is None:
+            val = 0
+        else:
+            val = safe_get(
+                img.reduceRegion(
+                    ee.Reducer.mean(),
+                    point.buffer(500),
+                    500,
+                    bestEffort=True
+                ).get("avg_rad")
+            ) or 0
 
-        val = val.getInfo() if val else 0
         data.append({"year": year, "mean": val})
 
     df = pd.DataFrame(data)
     df["mean_smooth"] = df["mean"].rolling(3, min_periods=1).mean()
-
     return df
 
 
 # ================= FLATTEN =================
-def flatten_current_features(current_df):
+def flatten_current_features(df):
     out = {}
-
-    for _, row in current_df.iterrows():
+    for _, row in df.iterrows():
         b = int(row["buffer_m"])
-
         for col in [
-            "mean", "median", "mode",
-            "stdDev", "variance", "cv",
+            "mean", "median", "stdDev", "variance", "cv",
             "p25", "p75", "p10", "p90",
-            "min", "max",
-            "range", "iqr"
+            "min", "max", "range", "iqr"
         ]:
-            if col in row:
-                out[f"{col}_{b}"] = row[col]
-
+            out[f"{col}_{b}"] = row.get(col, 0)
     return out
 
 
 # ================= SCORING =================
 def compute_ntlr(current_df, hist_df):
 
-    def weighted(col):
-        weights = current_df['buffer_m'].map(BUFFER_WEIGHTS)
-        return float((current_df[col] * weights).sum())
+    if current_df.empty:
+        return (0, 0, 0, 0, 0, 0, 0, 0)
 
-    avg_mean = weighted('mean')
-    avg_median = weighted('median')
-    avg_mode = weighted('mode')
+    w = current_df["buffer_m"].map(BUFFER_WEIGHTS)
 
-    current_score = (avg_mean + avg_median + avg_mode) / 3
+    current_score = (
+        (current_df["mean"] * w).sum() +
+        (current_df["median"] * w).sum()
+    ) / 2
 
-    mean_500 = current_df[current_df['buffer_m'] == 500]['mean'].values[0]
-    mean_2000 = current_df[current_df['buffer_m'] == 2000]['mean'].values[0]
+    mean_500 = current_df[current_df["buffer_m"] == 500]["mean"].values[0]
+    mean_2000 = current_df[current_df["buffer_m"] == 2000]["mean"].values[0]
 
-    # ---------- LCI SAFE ----------
     lci = mean_500 / (mean_2000 + EPS)
 
-    # ---------- SPATIAL METRICS SAFE ----------
-    volatility = np.mean([
-        sd / (m + EPS)
-        for sd, m in zip(current_df['stdDev'], current_df['mean'])
-    ])
-
-    norm_iqr = np.mean([
-        (p75 - p25) / (m + EPS)
-        for p75, p25, m in zip(current_df['p75'], current_df['p25'], current_df['mean'])
-    ])
+    volatility = np.mean(current_df["stdDev"] / (current_df["mean"] + EPS))
+    norm_iqr = np.mean(current_df["iqr"] / (current_df["mean"] + EPS))
 
     stability = max(0, 1 - volatility)
     uniformity = max(0, 1 - norm_iqr)
 
     spatial_score = (stability + uniformity + lci) * mean_500
 
-    # ---------- TEMPORAL ----------
-    if len(hist_df) >= 2:
-        slope = linregress(hist_df['year'], hist_df['mean_smooth']).slope
+    if len(hist_df) > 1:
+        slope = linregress(hist_df["year"], hist_df["mean_smooth"]).slope
     else:
         slope = 0
 
-    raw_temporal = slope * mean_500
+    temporal_score = 50 * np.tanh((slope * mean_500) / 100)
 
-    # Safer bounded version (recommended)
-    temporal_score = 50 * np.tanh(raw_temporal / 100)
-
-    # If you still want hard clipping instead, use:
-    # temporal_score = np.clip(raw_temporal, -75, 150)
-
-    final_score = (
+    final_score = max(
+        0,
         0.4 * current_score +
         0.4 * spatial_score +
         0.2 * temporal_score
     )
-
-    final_score = max(0, final_score)
 
     return (
         current_score,
@@ -217,27 +255,25 @@ def classify_region(mean_500, lci):
         return "Peri-Urban"
     elif mean_500 > 3:
         return "Rural"
-    else:
-        return "Dark"
+    return "Dark"
 
 
 # ================= MAIN =================
 def main():
+
     initialize_gee()
 
     df_input = pd.read_csv("location.csv")
 
-    if os.path.exists(OUTPUT_FILE):
-        df_existing = pd.read_csv(OUTPUT_FILE)
-        processed = set(zip(df_existing["Latitude"], df_existing["Longitude"]))
-        write_header = False
-    else:
-        processed = set()
-        write_header = True
+    start_idx = load_checkpoint()
+    processed = load_processed()
 
-    for row in tqdm(df_input.itertuples(index=False), total=len(df_input)):
-        lat = row.Latitude
-        lon = row.Longitude
+    print(f"🔁 Resuming from index: {start_idx}")
+
+    for idx, row in tqdm(df_input.iloc[start_idx:].iterrows(),
+                         total=len(df_input) - start_idx):
+
+        lat, lon = row["Latitude"], row["Longitude"]
 
         if (lat, lon) in processed:
             continue
@@ -246,27 +282,29 @@ def main():
             current_df = get_current_ntl(lat, lon)
             hist_df = get_historical_ntl(lat, lon)
 
-            (current_score,
-             spatial_score,
-             temporal_score,
-             final_score,
-             lci,
-             stability,
-             uniformity,
-             mean_500) = compute_ntlr(current_df, hist_df)
+            (
+                current_score,
+                spatial_score,
+                temporal_score,
+                final_score,
+                lci,
+                stability,
+                uniformity,
+                mean_500
+            ) = compute_ntlr(current_df, hist_df)
 
             region = classify_region(mean_500, lci)
-
-            raw_features = flatten_current_features(current_df)
 
             out = {
                 "Latitude": lat,
                 "Longitude": lon,
-                **raw_features,
+                **flatten_current_features(current_df),
+
                 "current_score": current_score,
                 "spatial_score": spatial_score,
                 "temporal_score": temporal_score,
                 "final_score": final_score,
+
                 "lci": lci,
                 "stability": stability,
                 "uniformity": uniformity,
@@ -280,12 +318,14 @@ def main():
 
             pd.DataFrame([out]).to_csv(
                 OUTPUT_FILE,
-                mode='a',
-                header=write_header,
+                mode="a",
+                header=not os.path.exists(OUTPUT_FILE),
                 index=False
             )
 
-            write_header = False
+            processed.add((lat, lon))
+            save_processed(processed)
+            save_checkpoint(idx + 1)
 
         except Exception as e:
             print(f"❌ Error at {lat},{lon}: {e}")

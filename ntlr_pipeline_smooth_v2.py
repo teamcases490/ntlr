@@ -20,7 +20,7 @@ BUFFER_WEIGHTS = {
     2000: 0.06
 }
 
-OUTPUT_FILE = "ntlr_output_final.csv"
+OUTPUT_FILE = "ntlr_smoothened_v2_final.csv"
 CHECKPOINT_FILE = "ntlr_checkpoint.txt"
 PROCESSED_FILE = "ntlr_processed.json"
 
@@ -83,18 +83,25 @@ def get_reducer():
 
 
 # ================= SAFE GEE FETCH =================
-def safe_get(d):
-    try:
-        return d.getInfo()
-    except:
-        return None
+def safe_get(d, retries=3, delay=2):
+    for i in range(retries):
+        try:
+            return d.getInfo()
+        except Exception:
+            time.sleep(delay * (2 ** i))
+    return None
 
 
 # ================= CURRENT =================
 def get_current_ntl(lat, lon):
-    viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select("avg_rad")
 
-    image = viirs.filterDate("2025-03-01", "2025-04-01").first()
+    viirs = ee.ImageCollection(
+        "NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG"
+    ).select("avg_rad")
+
+    # FIX: .first() -> .mean() for stability
+    image = viirs.filterDate("2025-03-01", "2025-04-01").mean()
+
     if image is None:
         return pd.DataFrame()
 
@@ -134,7 +141,6 @@ def get_current_ntl(lat, lon):
         "avg_rad_p75": "p75"
     })
 
-    # safe numeric fill
     for c in ["mean", "median", "stdDev", "min", "max", "p25", "p75"]:
         if c in df:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
@@ -143,6 +149,7 @@ def get_current_ntl(lat, lon):
     df["cv"] = df["stdDev"] / (df["mean"] + EPS)
     df["range"] = df["max"] - df["min"]
     df["iqr"] = df["p75"] - df["p25"]
+
     df["p10"] = df["min"] + 0.1 * df["range"]
     df["p90"] = df["min"] + 0.9 * df["range"]
 
@@ -151,17 +158,25 @@ def get_current_ntl(lat, lon):
 
 # ================= HISTORICAL =================
 def get_historical_ntl(lat, lon):
-    viirs = ee.ImageCollection("NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG").select("avg_rad")
+
+    viirs = ee.ImageCollection(
+        "NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG"
+    ).select("avg_rad")
 
     point = ee.Geometry.Point([lon, lat])
 
     data = []
 
     for year in YEARS:
-        img = viirs.filterDate(f"{year}-03-01", f"{year}-04-01").first()
+
+        # FIX: .first() -> .mean()
+        img = viirs.filterDate(
+            f"{year}-03-01",
+            f"{year}-04-01"
+        ).mean()
 
         if img is None:
-            val = 0
+            val = np.nan
         else:
             val = safe_get(
                 img.reduceRegion(
@@ -169,27 +184,34 @@ def get_historical_ntl(lat, lon):
                     point.buffer(500),
                     500,
                     bestEffort=True
-                ).get("avg_rad")
-            ) or 0
+                )
+            )
+
+            val = val.get("avg_rad") if val else np.nan
 
         data.append({"year": year, "mean": val})
 
     df = pd.DataFrame(data)
+
     df["mean_smooth"] = df["mean"].rolling(3, min_periods=1).mean()
+
     return df
 
 
 # ================= FLATTEN =================
 def flatten_current_features(df):
     out = {}
+
     for _, row in df.iterrows():
         b = int(row["buffer_m"])
+
         for col in [
             "mean", "median", "stdDev", "variance", "cv",
             "p25", "p75", "p10", "p90",
             "min", "max", "range", "iqr"
         ]:
             out[f"{col}_{b}"] = row.get(col, 0)
+
     return out
 
 
@@ -211,8 +233,17 @@ def compute_ntlr(current_df, hist_df):
 
     lci = mean_500 / (mean_2000 + EPS)
 
-    volatility = np.mean(current_df["stdDev"] / (current_df["mean"] + EPS))
-    norm_iqr = np.mean(current_df["iqr"] / (current_df["mean"] + EPS))
+    volatility = np.mean(
+        current_df["stdDev"] /
+        (current_df["mean"].replace(0, np.nan))
+    )
+    volatility = np.nan_to_num(volatility, nan=0.0)
+
+    norm_iqr = np.mean(
+        (current_df["p75"] - current_df["p25"]) /
+        (current_df["mean"].replace(0, np.nan))
+    )
+    norm_iqr = np.nan_to_num(norm_iqr, nan=0.0)
 
     stability = max(0, 1 - volatility)
     uniformity = max(0, 1 - norm_iqr)
@@ -270,8 +301,10 @@ def main():
 
     print(f"🔁 Resuming from index: {start_idx}")
 
-    for idx, row in tqdm(df_input.iloc[start_idx:].iterrows(),
-                         total=len(df_input) - start_idx):
+    for idx, row in tqdm(
+        df_input.iloc[start_idx:].iterrows(),
+        total=len(df_input) - start_idx
+    ):
 
         lat, lon = row["Latitude"], row["Longitude"]
 

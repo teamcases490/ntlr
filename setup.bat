@@ -1,26 +1,33 @@
 @echo off
+title NTLR V1 PIPELINE SETUP
+
 echo ============================================
-echo NTLR PIPELINE - SETUP
+echo NTLR V1 PIPELINE - SETUP
 echo ============================================
 echo.
 
-echo [1/5] Checking Python installation...
+REM =========================================================
+REM [1/6] CHECK PYTHON
+REM =========================================================
+echo [1/6] Checking Python installation...
 python --version
 if errorlevel 1 (
-    echo ERROR: Python not found. Please install Python 3.8+
+    echo ERROR: Python 3.8+ is required but not installed.
     pause
     exit /b 1
 )
 echo.
 
-echo [2/5] Creating virtual environment...
+REM =========================================================
+REM [2/6] CREATE VIRTUAL ENVIRONMENT
+REM =========================================================
+echo [2/6] Creating virtual environment...
 if exist venv (
-    echo Virtual environment already exists, skipping creation...
+    echo Virtual environment already exists. Skipping...
 ) else (
-    echo Creating new virtual environment...
     python -m venv venv
     if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment
+        echo ERROR: Failed to create virtual environment.
         pause
         exit /b 1
     )
@@ -28,65 +35,109 @@ if exist venv (
 )
 echo.
 
-echo [3/5] Activating virtual environment...
+REM =========================================================
+REM [3/6] ACTIVATE VENV
+REM =========================================================
+echo [3/6] Activating virtual environment...
 call venv\Scripts\activate.bat
 if errorlevel 1 (
-    echo ERROR: Failed to activate virtual environment
+    echo ERROR: Failed to activate virtual environment.
     pause
     exit /b 1
 )
 echo Virtual environment activated!
 echo.
 
-echo [4/5] Installing dependencies...
-pip install --upgrade pip
+REM =========================================================
+REM [4/6] INSTALL DEPENDENCIES
+REM =========================================================
+echo [4/6] Installing dependencies...
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 if errorlevel 1 (
-    echo ERROR: Failed to install dependencies
+    echo ERROR: Dependency installation failed.
     pause
     exit /b 1
 )
+echo Dependencies installed successfully!
 echo.
 
-echo [5/5] Checking configuration...
-if not exist .env (
-    echo WARNING: .env file not found
-    echo Creating .env from template...
-    copy .env.template .env
+REM =========================================================
+REM [5/6] CHECK GOOGLE AUTH FILES
+REM =========================================================
+echo [5/6] Checking Google authentication setup...
+
+if not exist client_secrets.json (
+    echo WARNING: client_secrets.json NOT found.
     echo.
-    echo IMPORTANT: Edit .env and add your API keys!
+    echo Required for first-time Google Drive OAuth authentication.
+    echo Download OAuth Desktop credentials from Google Cloud Console
+    echo and place them in project root as:
+    echo client_secrets.json
     echo.
+) else (
+    echo client_secrets.json found.
 )
 
-if not exist credentials.json (
-    echo WARNING: credentials.json not found
-    echo Please add your Google Earth Engine service account JSON file
-    echo.
+if exist credentials.json (
+    echo credentials.json found. Silent login enabled.
+) else (
+    echo credentials.json not found yet.
+    echo First pipeline run will open browser for Google login.
 )
+
 echo.
 
-echo Creating directories...
-if not exist cache mkdir cache
+REM =========================================================
+REM [6/6] CREATE PROJECT FOLDERS
+REM =========================================================
+echo [6/6] Creating required directories...
+
+if not exist data mkdir data
+if not exist result mkdir result
+if not exist versions mkdir versions
+if not exist utils mkdir utils
 if not exist logs mkdir logs
-if not exist downloads mkdir downloads
-if not exist downloads\current mkdir downloads\current
-if not exist downloads\historical mkdir downloads\historical
+
+echo Directories ready!
 echo.
 
+REM =========================================================
+REM FINAL STATUS
+REM =========================================================
 echo ============================================
-echo SETUP COMPLETE!
+echo NTLR V1 SETUP COMPLETE!
 echo ============================================
 echo.
-echo Virtual environment is ready at: venv\
+echo Project folders:
+echo   data\      - Extracted + enriched datasets
+echo   result\    - Version outputs (result_v1.csv, result_v2.csv)
+echo   versions\  - Logic versions
+echo   utils\     - Shared loaders/helpers
 echo.
-echo Next steps:
-echo 1. Edit .env and add your GOOGLE_API_KEY and GCS_BUCKET
-echo 2. Add credentials.json (GEE service account)
-echo 3. Activate venv: venv\Scripts\activate
-echo 4. Authenticate GEE: earthengine authenticate
-echo 5. Run pipeline: python main.py
+echo Next Steps:
 echo.
-echo To activate the virtual environment in future sessions:
+echo 1. Add client_secrets.json to project root
+echo 2. Run extractor:
+echo      python ntlr_pipeline.py
+echo.
+echo    First run:
+echo      Browser OAuth
+echo    Later runs:
+echo      Silent login via credentials.json
+echo.
+echo 3. Run Version 1:
+echo      python versions\ntlr_v1.py
+echo.
+echo 4. Run Version 2:
+echo      python versions\ntlr_v2.py
+echo.
+echo Git Branch Suggestion:
+echo   extractor  = raw extraction
+echo   v1         = baseline scoring
+echo   v2         = weighted stddev penalty
+echo.
+echo To activate virtual environment later:
 echo   venv\Scripts\activate
 echo.
 pause
